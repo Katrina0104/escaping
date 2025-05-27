@@ -13,7 +13,10 @@ public class CharController_Motor : MonoBehaviour {
 	float rotX, rotY;
 	public bool webGLRightClickRotation = true;
 	float gravity = -9.8f;
-
+	//new
+	float jumpforce = 5f;
+	float verticalvelocity = 0;
+	float gravityscale = 20f;
 
 	void Start(){
 		//LockCursor ();
@@ -46,9 +49,18 @@ public class CharController_Motor : MonoBehaviour {
 		//rotY = Input.GetKey (KeyCode.Joystick1Button5);
 
 		CheckForWaterHeight ();
+		if(character.isGrounded)
+		{
+			verticalvelocity = -1f;
+			if(Input.GetKeyDown (KeyCode.Space))
+			{
+				verticalvelocity = jumpforce;
+			}
+		}
+		else
+			verticalvelocity += gravity * Time.deltaTime;
 
-
-		Vector3 movement = new Vector3 (moveFB, gravity, moveLR);
+		Vector3 movement = new Vector3 (moveFB, verticalvelocity, moveLR);
 
 
 
