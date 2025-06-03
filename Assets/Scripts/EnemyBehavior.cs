@@ -1,122 +1,208 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(NavMeshAgent))]
-public class HomeBoundWanderer : MonoBehaviour
+public class AdvancedEnemyAI : MonoBehaviour
 {
-    [Header("Home Position Settings")]
-    [Tooltip("Center point the AI should stay near")]
-    public Vector3 homePosition = Vector3.zero;
+    public enum AIState { Wander, Chase, Attack }
 
-    [Tooltip("Maximum distance from home position (XZ plane)")]
-    public float maxRoamDistance = 10f;
+    [Header("State Settings")]
+    public AIState currentState = AIState.Wander;
+    [SerializeField] private float attackRange = 2f;
+    [SerializeField] private float chaseRange = 10f;
+    [SerializeField] private float attackDuration = 1.5f;
 
-    [Tooltip("How strongly the AI is pulled back toward home (0 = no pull, 1 = strict boundary)")]
-    [Range(0f, 1f)] public float homePullStrength = 0.5f;
+    [Header("Detection Settings")]
+    public float detectionRadius = 12f;
+    public LayerMask playerLayer;
 
-    [Header("Wandering Settings")]
+    [Header("Wander Settings")]
+    public float wanderRadius = 10f;
     public float minWaitTime = 1f;
     public float maxWaitTime = 3f;
-    public float moveSpeed = 3f;
-    public float turnSpeed = 120f;
+    [SerializeField] private float homePullStrength = 0.7f;
 
-    [Header("Debug")]
-    [SerializeField] private Vector3 currentDestination;
-    [SerializeField] private float waitTimer;
-    [SerializeField] private bool isWaiting;
+    [Header("Movement Settings")]
+    public float wanderSpeed = 2f;
+    public float chaseSpeed = 5f;
+
+    [Header("References")]
+    public Transform target;
+    public UnityEvent OnAttack;
 
     private NavMeshAgent agent;
+    private float stateTimer;
+    private Vector3 homePosition;
+    private bool isAttacking;
+    private Vector3 currentDestination;
 
-    private void Awake()
+    void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
-        agent.speed = moveSpeed;
-        agent.angularSpeed = turnSpeed;
-        homePosition = transform.position; // Default to starting position
-        SetNewDestination();
+        homePosition = transform.position;
     }
 
-    private void Update()
+    void Update()
     {
-        if (isWaiting)
+        switch (currentState)
         {
-            waitTimer -= Time.deltaTime;
-            if (waitTimer <= 0)
-            {
-                isWaiting = false;
-                SetNewDestination();
-            }
+            case AIState.Wander:
+                UpdateWanderState();
+                break;
+            case AIState.Chase:
+                UpdateChaseState();
+                break;
+            case AIState.Attack:
+                UpdateAttackState();
+                break;
+        }
+    }
+
+    void UpdateWanderState()
+    {
+        // Check for player nearby using CheckSphere
+        if (Physics.CheckSphere(transform.position, detectionRadius, playerLayer))
+        {
+            currentState = AIState.Chase;
             return;
         }
 
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+        if (!isAttacking && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
-            StartWaiting();
+            if (stateTimer <= 0)
+            {
+                SetRandomDestination();
+                stateTimer = Random.Range(minWaitTime, maxWaitTime);
+            }
+            else
+            {
+                stateTimer -= Time.deltaTime;
+            }
         }
     }
 
-    private void SetNewDestination()
+    void UpdateChaseState()
+    {
+        if (target == null)
+        {
+            currentState = AIState.Wander;
+            return;
+        }
+
+        float distance = Vector3.Distance(transform.position, target.position);
+
+        if (distance <= attackRange)
+        {
+            currentState = AIState.Attack;
+            StartAttack();
+            return;
+        }
+
+        if (distance > chaseRange * 1.5f)
+        {
+            currentState = AIState.Wander;
+            return;
+        }
+
+        agent.speed = chaseSpeed;
+        agent.SetDestination(target.position);
+    }
+
+    void UpdateAttackState()
+    {
+        if (!isAttacking)
+        {
+            if (target != null && Vector3.Distance(transform.position, target.position) > attackRange * 1.2f)
+            {
+                currentState = AIState.Chase;
+            }
+            else
+            {
+                currentState = AIState.Wander;
+            }
+        }
+    }
+
+    void StartAttack()
+    {
+        isAttacking = true;
+        agent.isStopped = true;
+        OnAttack.Invoke();
+        Invoke("FinishAttack", attackDuration);
+    }
+
+    void FinishAttack()
+    {
+        isAttacking = false;
+        agent.isStopped = false;
+    }
+
+    void SetRandomDestination()
     {
         Vector3 randomDirection = GetBoundedRandomDirection();
 
-        if (NavMesh.SamplePosition(randomDirection, out NavMeshHit hit, maxRoamDistance, NavMesh.AllAreas))
+        if (NavMesh.SamplePosition(randomDirection, out NavMeshHit hit, wanderRadius, NavMesh.AllAreas))
         {
             currentDestination = hit.position;
+            agent.speed = wanderSpeed;
             agent.SetDestination(currentDestination);
         }
     }
 
-    private Vector3 GetBoundedRandomDirection()
+    Vector3 GetBoundedRandomDirection()
     {
-        // Base random point
-        Vector2 randomCircle = Random.insideUnitCircle * maxRoamDistance;
+        Vector2 randomCircle = Random.insideUnitCircle * wanderRadius;
         Vector3 randomPoint = new Vector3(
             homePosition.x + randomCircle.x,
             homePosition.y,
             homePosition.z + randomCircle.y
         );
 
-        // Apply pull toward home
         Vector3 pullDirection = (homePosition - transform.position).normalized;
         float distanceFromHome = Vector3.Distance(
             new Vector3(transform.position.x, 0, transform.position.z),
             new Vector3(homePosition.x, 0, homePosition.z)
         );
 
-        // Normalized pull factor (0 at center, 1 at boundary)
-        float pullFactor = Mathf.Clamp01(distanceFromHome / maxRoamDistance) * homePullStrength;
+        float pullFactor = Mathf.Clamp01(distanceFromHome / wanderRadius) * homePullStrength;
 
         return Vector3.Lerp(randomPoint, homePosition, pullFactor);
     }
 
-    private void StartWaiting()
+    private void OnDrawGizmosSelected()
     {
-        isWaiting = true;
-        waitTimer = Random.Range(minWaitTime, maxWaitTime);
+        Gizmos.color = new Color(0, 1, 1, 0.3f);
+        Gizmos.DrawWireSphere(homePosition, wanderRadius);
+
+        Gizmos.color = new Color(1, 1, 0, 0.2f);
+        Gizmos.DrawWireSphere(transform.position, chaseRange);
+
+        Gizmos.color = new Color(1, 0, 0, 0.3f);
+        Gizmos.DrawWireSphere(transform.position, attackRange);
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, detectionRadius); // Visualize CheckSphere
+
+        if (agent != null && agent.hasPath)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(transform.position, currentDestination);
+            Gizmos.DrawWireCube(currentDestination, Vector3.one * 0.5f);
+        }
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawSphere(homePosition, 0.25f);
     }
 
-    // Call this to dynamically update home position
     public void SetHomePosition(Vector3 newHome)
     {
         homePosition = newHome;
     }
 
-    private void OnDrawGizmosSelected()
+    public void SetState(AIState newState)
     {
-        // Draw home boundary
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(homePosition, maxRoamDistance);
-
-        // Draw current path
-        if (agent != null && agent.hasPath)
-        {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(transform.position, currentDestination);
-            Gizmos.DrawWireCube(currentDestination, Vector3.one);
-        }
-
-        // Draw home position marker
-        Gizmos.color = Color.green;
-        Gizmos.DrawSphere(homePosition, 0.5f);
+        currentState = newState;
+        stateTimer = 0;
     }
 }
