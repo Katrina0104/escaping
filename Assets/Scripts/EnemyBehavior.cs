@@ -1,118 +1,122 @@
 using UnityEngine;
 using UnityEngine.AI;
 
-public class EnemyAiTutorial : MonoBehaviour
+[RequireComponent(typeof(NavMeshAgent))]
+public class HomeBoundWanderer : MonoBehaviour
 {
-    public NavMeshAgent agent;
+    [Header("Home Position Settings")]
+    [Tooltip("Center point the AI should stay near")]
+    public Vector3 homePosition = Vector3.zero;
 
-    public Transform player;
+    [Tooltip("Maximum distance from home position (XZ plane)")]
+    public float maxRoamDistance = 10f;
 
-    public LayerMask whatIsGround, whatIsPlayer;
+    [Tooltip("How strongly the AI is pulled back toward home (0 = no pull, 1 = strict boundary)")]
+    [Range(0f, 1f)] public float homePullStrength = 0.5f;
 
-    public float health;
+    [Header("Wandering Settings")]
+    public float minWaitTime = 1f;
+    public float maxWaitTime = 3f;
+    public float moveSpeed = 3f;
+    public float turnSpeed = 120f;
 
-    //Patroling
-    public Vector3 walkPoint;
-    bool walkPointSet;
-    public float walkPointRange;
+    [Header("Debug")]
+    [SerializeField] private Vector3 currentDestination;
+    [SerializeField] private float waitTimer;
+    [SerializeField] private bool isWaiting;
 
-    //Attacking
-    public float timeBetweenAttacks;
-    bool alreadyAttacked;
-    public GameObject projectile;
-
-    //States
-    public float sightRange, attackRange;
-    public bool playerInSightRange, playerInAttackRange;
+    private NavMeshAgent agent;
 
     private void Awake()
     {
-        player = GameObject.Find("PlayerObj").transform;
         agent = GetComponent<NavMeshAgent>();
+        agent.speed = moveSpeed;
+        agent.angularSpeed = turnSpeed;
+        homePosition = transform.position; // Default to starting position
+        SetNewDestination();
     }
 
     private void Update()
     {
-        //Check for sight and attack range
-        playerInSightRange = Physics.CheckSphere(transform.position, sightRange, whatIsPlayer);
-        playerInAttackRange = Physics.CheckSphere(transform.position, attackRange, whatIsPlayer);
-
-        if (!playerInSightRange && !playerInAttackRange) Patroling();
-        if (playerInSightRange && !playerInAttackRange) ChasePlayer();
-        if (playerInAttackRange && playerInSightRange) AttackPlayer();
-    }
-
-    private void Patroling()
-    {
-        if (!walkPointSet) SearchWalkPoint();
-
-        if (walkPointSet)
-            agent.SetDestination(walkPoint);
-
-        Vector3 distanceToWalkPoint = transform.position - walkPoint;
-
-        //Walkpoint reached
-        if (distanceToWalkPoint.magnitude < 1f)
-            walkPointSet = false;
-    }
-    private void SearchWalkPoint()
-    {
-        //Calculate random point in range
-        float randomZ = Random.Range(-walkPointRange, walkPointRange);
-        float randomX = Random.Range(-walkPointRange, walkPointRange);
-
-        walkPoint = new Vector3(transform.position.x + randomX, transform.position.y, transform.position.z + randomZ);
-
-        if (Physics.Raycast(walkPoint, -transform.up, 2f, whatIsGround))
-            walkPointSet = true;
-    }
-
-    private void ChasePlayer()
-    {
-        agent.SetDestination(player.position);
-    }
-
-    private void AttackPlayer()
-    {
-        //Make sure enemy doesn't move
-        agent.SetDestination(transform.position);
-
-        transform.LookAt(player);
-
-        if (!alreadyAttacked)
+        if (isWaiting)
         {
-            ///Attack code here
-            Rigidbody rb = Instantiate(projectile, transform.position, Quaternion.identity).GetComponent<Rigidbody>();
-            rb.AddForce(transform.forward * 32f, ForceMode.Impulse);
-            rb.AddForce(transform.up * 8f, ForceMode.Impulse);
-            ///End of attack code
+            waitTimer -= Time.deltaTime;
+            if (waitTimer <= 0)
+            {
+                isWaiting = false;
+                SetNewDestination();
+            }
+            return;
+        }
 
-            alreadyAttacked = true;
-            Invoke(nameof(ResetAttack), timeBetweenAttacks);
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+        {
+            StartWaiting();
         }
     }
-    private void ResetAttack()
+
+    private void SetNewDestination()
     {
-        alreadyAttacked = false;
+        Vector3 randomDirection = GetBoundedRandomDirection();
+
+        if (NavMesh.SamplePosition(randomDirection, out NavMeshHit hit, maxRoamDistance, NavMesh.AllAreas))
+        {
+            currentDestination = hit.position;
+            agent.SetDestination(currentDestination);
+        }
     }
 
-    public void TakeDamage(int damage)
+    private Vector3 GetBoundedRandomDirection()
     {
-        health -= damage;
+        // Base random point
+        Vector2 randomCircle = Random.insideUnitCircle * maxRoamDistance;
+        Vector3 randomPoint = new Vector3(
+            homePosition.x + randomCircle.x,
+            homePosition.y,
+            homePosition.z + randomCircle.y
+        );
 
-        if (health <= 0) Invoke(nameof(DestroyEnemy), 0.5f);
+        // Apply pull toward home
+        Vector3 pullDirection = (homePosition - transform.position).normalized;
+        float distanceFromHome = Vector3.Distance(
+            new Vector3(transform.position.x, 0, transform.position.z),
+            new Vector3(homePosition.x, 0, homePosition.z)
+        );
+
+        // Normalized pull factor (0 at center, 1 at boundary)
+        float pullFactor = Mathf.Clamp01(distanceFromHome / maxRoamDistance) * homePullStrength;
+
+        return Vector3.Lerp(randomPoint, homePosition, pullFactor);
     }
-    private void DestroyEnemy()
+
+    private void StartWaiting()
     {
-        Destroy(gameObject);
+        isWaiting = true;
+        waitTimer = Random.Range(minWaitTime, maxWaitTime);
+    }
+
+    // Call this to dynamically update home position
+    public void SetHomePosition(Vector3 newHome)
+    {
+        homePosition = newHome;
     }
 
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, sightRange);
+        // Draw home boundary
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(homePosition, maxRoamDistance);
+
+        // Draw current path
+        if (agent != null && agent.hasPath)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(transform.position, currentDestination);
+            Gizmos.DrawWireCube(currentDestination, Vector3.one);
+        }
+
+        // Draw home position marker
+        Gizmos.color = Color.green;
+        Gizmos.DrawSphere(homePosition, 0.5f);
     }
 }
-
