@@ -1,11 +1,18 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(NavMeshAgent))]
+
 public class AdvancedEnemyAI : MonoBehaviour
 {
+    [Header("Attack Settings")]
+    [SerializeField] private float attackFacingOffsetAngle = 0f;
     public enum AIState { Wander, Chase, Attack }
+    private bool isIdle;
+    private bool hasCheckedFacing;
+
+    public bool IsIdle => isIdle; // Read-only externally
 
     [Header("State Settings")]
     public AIState currentState = AIState.Wander;
@@ -47,6 +54,7 @@ public class AdvancedEnemyAI : MonoBehaviour
     {
         switch (currentState)
         {
+
             case AIState.Wander:
                 UpdateWanderState();
                 break;
@@ -57,6 +65,9 @@ public class AdvancedEnemyAI : MonoBehaviour
                 UpdateAttackState();
                 break;
         }
+        // Check if idle (i.e., no path and not attacking)
+        isIdle = !isAttacking && (!agent.hasPath || agent.velocity.sqrMagnitude < 0.01f);
+
     }
 
     void UpdateWanderState()
@@ -78,8 +89,11 @@ public class AdvancedEnemyAI : MonoBehaviour
             else
             {
                 stateTimer -= Time.deltaTime;
+                // No destination yet — considered idle
+                isIdle = true;
             }
         }
+
     }
 
     void UpdateChaseState()
@@ -121,12 +135,37 @@ public class AdvancedEnemyAI : MonoBehaviour
             {
                 currentState = AIState.Wander;
             }
+            return;
         }
+
+        // ✅ Face the target once when entering attack
+        if (!hasCheckedFacing && target != null)
+        {
+            Vector3 directionToTarget = (target.position - transform.position).normalized;
+            directionToTarget.y = 0; // ignore vertical difference
+
+            if (directionToTarget != Vector3.zero)
+            {
+                // Calculate the base rotation
+                Quaternion lookRotation = Quaternion.LookRotation(directionToTarget);
+
+                // Apply Y-axis angle offset
+                Quaternion offsetRotation = Quaternion.Euler(0f, attackFacingOffsetAngle, 0f);
+                transform.rotation = lookRotation * offsetRotation;
+            }
+
+            hasCheckedFacing = true;
+        }
+
     }
+
 
     void StartAttack()
     {
+         
+
         isAttacking = true;
+        hasCheckedFacing = false;
         agent.isStopped = true;
         OnAttack.Invoke();
         Invoke("FinishAttack", attackDuration);
