@@ -1,8 +1,11 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EnemyHealth : MonoBehaviour
 {
     public static EnemyHealth Instance;
+
+    public Slider HP_Slider;
     [SerializeField] private int Enemyhealth = 100;
     private void Awake()
     {
@@ -22,7 +25,11 @@ public class EnemyHealth : MonoBehaviour
         Enemyhealth -= damage;
         Debug.Log(Enemyhealth);
         if (Enemyhealth <= 0)
+        {
+            Enemyhealth = 0;
+            UpdateSlider();
             Die();
+        }
     }
     private void Die()
     {
@@ -31,6 +38,13 @@ public class EnemyHealth : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+        UpdateSlider();
+    }
+    private void UpdateSlider()
+    {
+        if (HP_Slider != null)
+        {
+            HP_Slider.value = Enemyhealth;
+        }
     }
 }

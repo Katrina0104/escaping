@@ -90,9 +90,9 @@ public class CharController_Motor : MonoBehaviour
     {
         transform.Rotate(0, rotX * Time.deltaTime, 0);
 
-        // 累加 pitch，限制在 -75 到 75 度之間
+        // 累加 pitch，限制在 -65 到 65 度之間
         pitch -= rotY * Time.deltaTime;
-        pitch = Mathf.Clamp(pitch, -75f, 75f);
+        pitch = Mathf.Clamp(pitch, -65f, 65f);
 
         // 設定相機本地 X 角度
         Vector3 localEuler = cam.transform.localEulerAngles;
