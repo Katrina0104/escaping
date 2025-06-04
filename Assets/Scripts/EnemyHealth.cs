@@ -4,6 +4,7 @@ using UnityEngine.UI;
 public class EnemyHealth : MonoBehaviour
 {
     public static EnemyHealth Instance;
+    public static float EnemyDeath = 0;
 
     public Slider HP_Slider;
     [SerializeField] private int Enemyhealth = 100;
@@ -34,6 +35,7 @@ public class EnemyHealth : MonoBehaviour
     private void Die()
     {
         Destroy(gameObject);
+        EnemyDeath++;
     }
     // Update is called once per frame
     void Update()

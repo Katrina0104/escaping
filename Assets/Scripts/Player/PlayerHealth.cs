@@ -41,6 +41,10 @@ public class PlayerHealth : MonoBehaviour
        Scene Currentscene = SceneManager.GetActiveScene();
        SceneManager.LoadScene(Currentscene.name);
     }
+    public bool IsDead()
+    {
+        return Health <= 0;
+    }
     private void Update()
     {
         UpdateSlider();
