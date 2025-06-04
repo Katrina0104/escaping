@@ -8,6 +8,10 @@ public class EnemyHealth : MonoBehaviour
     {
         Instance = this;
     }
+    private void OnDestroy()
+    {
+        Instance = null;
+    }
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -16,12 +20,13 @@ public class EnemyHealth : MonoBehaviour
     public void TakeDamage(int damage)
     {
         Enemyhealth -= damage;
+        Debug.Log(Enemyhealth);
         if (Enemyhealth <= 0)
             Die();
     }
     private void Die()
     {
-        Destroy(this);
+        Destroy(gameObject);
     }
     // Update is called once per frame
     void Update()

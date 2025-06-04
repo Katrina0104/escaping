@@ -159,7 +159,8 @@ public class WeaponController : MonoBehaviour
                     // 給予傷害，如果對方有 TakeDamage 函數
                     if (hit.collider.CompareTag("Enemy"))
                     {
-                        EnemyHealth.Instance.TakeDamage(25);
+                        hit.collider.GetComponent<EnemyHealth>().TakeDamage(25);
+                        //EnemyHealth.Instance.TakeDamage(25);
                     }
 
                     // 命中特效
