@@ -1,4 +1,6 @@
+//using UnityEditor.SearchService;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class PlayerHealth : MonoBehaviour
@@ -36,7 +38,12 @@ public class PlayerHealth : MonoBehaviour
     }
     public void Die()
     {
-        //UI¨Æ¥ó
+       Scene Currentscene = SceneManager.GetActiveScene();
+       SceneManager.LoadScene(Currentscene.name);
+    }
+    private void Update()
+    {
+        UpdateSlider();
     }
     private void UpdateSlider()
     {
