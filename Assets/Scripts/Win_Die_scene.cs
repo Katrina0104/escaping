@@ -31,7 +31,7 @@ public class WinDieScene : MonoBehaviour
         bool playerDead = PlayerHealth.Instance != null && PlayerHealth.Instance.IsDead();
 
         // Check win condition
-        bool enemyWin = EnemyHealth.Instance != null && EnemyHealth.EnemyDeath >= 2;
+        bool enemyWin = EnemyHealth.Instance != null && EnemyHealth.EnemyDeath >= 10;
 
         // If either condition met and we haven't started ending yet
         if (!isEnding && (playerDead || enemyWin))
