@@ -2,10 +2,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class Win_Die_scene : MonoBehaviour
+public class WinDieScene : MonoBehaviour
 {
-    public Image fadeImage;
-    public float fadeDuration = 2f;
+    [Header("Fade Settings")]
+    public Image fadeImage;              // UI Image (black), stretched to fill screen
+    public float fadeDuration = 2f;      // Duration of fade in seconds
+
+    [Header("Scene Names")]
     public string loseSceneName = "GameOver";
     public string winSceneName = "Win";
 
@@ -13,11 +16,24 @@ public class Win_Die_scene : MonoBehaviour
     private bool playerLost = false;
     private float fadeTimer = 0f;
 
+    void Start()
+    {
+        // Start fully transparent
+        if (fadeImage != null)
+        {
+            fadeImage.color = new Color(0f, 0f, 0f, 0f);
+        }
+    }
+
     void Update()
     {
+        // Check lose condition
         bool playerDead = PlayerHealth.Instance != null && PlayerHealth.Instance.IsDead();
-        bool enemyWin = EnemyHealth.Instance != null && EnemyHealth.EnemyDeath >= 20;
 
+        // Check win condition
+        bool enemyWin = EnemyHealth.Instance != null && EnemyHealth.EnemyDeath >= 2;
+
+        // If either condition met and we haven't started ending yet
         if (!isEnding && (playerDead || enemyWin))
         {
             isEnding = true;
@@ -25,15 +41,18 @@ public class Win_Die_scene : MonoBehaviour
             fadeTimer = 0f;
         }
 
+        // Handle fade if game is ending
         if (isEnding)
         {
             fadeTimer += Time.deltaTime;
             float alpha = Mathf.Clamp01(fadeTimer / fadeDuration);
+
             if (fadeImage != null)
             {
-                fadeImage.color = new Color(0, 0, 0, alpha);
+                fadeImage.color = new Color(0f, 0f, 0f, alpha); // Fade to black
             }
 
+            // Once fade is complete, load the appropriate scene
             if (fadeTimer >= fadeDuration)
             {
                 string targetScene = playerLost ? loseSceneName : winSceneName;

@@ -1,4 +1,3 @@
-//using UnityEditor.SearchService;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -8,17 +7,35 @@ public class PlayerHealth : MonoBehaviour
     public static PlayerHealth Instance;
 
     public Slider HP_Slider;
+    [SerializeField] private int Health;
+
     private void Awake()
     {
         Instance = this;
     }
-    [SerializeField] private int Health;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
     void Start()
     {
         Health = 100;
         UpdateSlider();
     }
+
+    void OnEnable()
+    {
+        DelayedDoubleCheckLogger.PlayerLostHP += OnPlayerLostHP;
+    }
+
+    void OnDisable()
+    {
+        DelayedDoubleCheckLogger.PlayerLostHP -= OnPlayerLostHP;
+    }
+
+    // This method responds to the event
+    void OnPlayerLostHP()
+    {
+        TakeDamage(10);  // Deal 10 damage on event
+    }
+
     public void TakeDamage(int damage)
     {
         Health -= damage;
@@ -28,7 +45,12 @@ public class PlayerHealth : MonoBehaviour
             UpdateSlider();
             Die();
         }
+        else
+        {
+            UpdateSlider();
+        }
     }
+
     public void TakeHealth(int health)
     {
         Health += health;
@@ -36,19 +58,23 @@ public class PlayerHealth : MonoBehaviour
             Health = 100;
         UpdateSlider();
     }
+
     public void Die()
     {
-       Scene Currentscene = SceneManager.GetActiveScene();
-       SceneManager.LoadScene(Currentscene.name);
+        Scene Currentscene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(Currentscene.name);
     }
+
     public bool IsDead()
     {
         return Health <= 0;
     }
+
     private void Update()
     {
         UpdateSlider();
     }
+
     private void UpdateSlider()
     {
         if (HP_Slider != null)
