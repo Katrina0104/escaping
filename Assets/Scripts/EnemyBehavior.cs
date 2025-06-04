@@ -44,6 +44,21 @@ public class AdvancedEnemyAI : MonoBehaviour
     private bool isAttacking;
     private Vector3 currentDestination;
 
+    void Start()
+    {
+        if (target == null)
+        {
+            GameObject found = GameObject.Find("FpsController");
+            if (found != null)
+            {
+                target = found.transform;
+            }
+            else
+            {
+                Debug.LogWarning("FPSController not found! Make sure it exists in the scene.");
+            }
+        }
+    }
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
